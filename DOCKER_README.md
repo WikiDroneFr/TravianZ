@@ -1,313 +1,290 @@
-# TravianZ Docker Setup
+# TravianZ Docker deployment
 
-This guide will help you set up TravianZ using Docker and Docker Compose for easy deployment.
+This branch provides a working Docker proof of concept for TravianZ.
 
-## Prerequisites
+## Current status
 
-- Docker Engine 20.10 or higher
-- Docker Compose 1.29 or higher
-- At least 2GB of free RAM
-- At least 5GB of free disk space
+Validated with:
 
-## Quick Start
+- PHP 8.3 and Apache
+- MariaDB 11.4
+- the existing TravianZ web installer
+- database and world creation
+- 74 TravianZ database tables
+- player registration and login
+- administrator access
+- persistent database and runtime data after full container recreation
+- automatic blocking of `/install` after setup
+- HTTPS access behind Nginx Proxy Manager
 
-### 1. Clone the Repository
+This is still a proof of concept. Cron automation, reverse-proxy URL handling, SMTP configuration, image publishing and controlled updates are still planned.
+
+## Requirements
+
+- Docker Engine
+- Docker Compose v2
+- Git
+
+## Quick start
 
 ```bash
-git clone https://github.com/Shadowss/TravianZ.git
+git clone https://github.com/WikiDroneFr/TravianZ.git
 cd TravianZ
-```
-
-### 2. Configure Environment Variables
-
-Copy the example environment file and customize it if needed:
-
-```bash
+git switch feature/docker-poc
 cp .env.example .env
 ```
 
-Edit `.env` file to set your database credentials:
+Edit `.env` and replace all `CHANGE_ME` values with strong unique passwords.
 
-```env
-MARIADB_ROOT_PASSWORD=yourStrongRootPassword
-MARIADB_DATABASE=travian
-MARIADB_USER=travianz
-MARIADB_PASSWORD=yourStrongPassword
-```
-
-### 3. Start the Containers
+Start TravianZ:
 
 ```bash
+docker compose up -d --build
+```
+
+Default address:
+
+```text
+http://localhost:8810
+```
+
+## Installer database settings
+
+Use:
+
+```text
+Host: db
+Port: 3306
+Database: travian
+User: travianz
+Password: value of MARIADB_PASSWORD
+Type: MYSQLi
+Prefix: s1_ or the prefix required by your installation
+```
+
+The installer creates the database structure and world data. After successful installation, Apache blocks `/install`.
+
+## Persistent data
+
+Data is stored under `TRAVIANZ_DATA_DIR`:
+
+```text
+../data/
+├── mariadb/
+└── runtime/
+```
+
+Containers can be removed and recreated without deleting these files:
+
+```bash
+docker compose down
 docker compose up -d
 ```
 
-This command will:
-- Build the TravianZ web application container
-- Start a MariaDB (latest) database container
-- Start a phpMyAdmin container for database management
-- Set up a network for all containers to communicate
+Do not delete the persistent directories unless a verified backup exists.
 
-### 4. Access the Installation Wizard
+## Optional phpMyAdmin
 
-Once the containers are running, open your browser and navigate to:
-
-```
-http://localhost:8080/install
-```
-
-### 5. Complete the Installation
-
-During the installation wizard, use these database settings:
-
-- **SQL Hostname:** `db` (this is the Docker container name)
-- **Port:** `3306`
-- **Username:** `travianz` (or the value from your `.env` file)
-- **Password:** `travianzpass` (or the value from your `.env` file)
-- **DB name:** `travian` (or the value from your `.env` file)
-- **Prefix:** `s1_` (or customize as needed)
-- **Type:** `MYSQLi`
-
-Complete the rest of the installation wizard with your preferred server settings.
-
-## Services and Ports
-
-After starting the containers, the following services will be available:
-
-- **TravianZ Web Application:** http://localhost:8080
-- **phpMyAdmin:** http://localhost:8081
-- **MariaDB Database:** localhost:3306 (for external connections)
-
-## Container Management
-
-### View Running Containers
+phpMyAdmin is disabled by default:
 
 ```bash
+docker compose --profile tools up -d
+```
+
+Default address:
+
+```text
+http://localhost:8811
+```
+
+Do not expose phpMyAdmin publicly without additional protection.
+
+## Reverse proxy
+
+TravianZ has been tested behind Nginx Proxy Manager.
+
+Example upstream:
+
+```text
+Scheme: http
+Host: Docker host address
+Port: 8810
+```
+
+Forward at least:
+
+```text
+Host
+X-Forwarded-For
+X-Forwarded-Proto
+X-Real-IP
+```
+
+A future version should support:
+
+```env
+TRAVIANZ_PUBLIC_URL=https://travianz.example.org
+```
+
+This value should define `DOMAIN`, `HOMEPAGE` and `SERVER` so public links never expose an internal address or port.
+
+## Security
+
+The image:
+
+- excludes `.git` and `.env`
+- blocks Docker-related files
+- disables directory listing
+- blocks `/install` after setup
+- uses dedicated writable runtime paths
+
+Never use `chmod -R 777`. Real secrets must never be committed.
+
+## Backup
+
+A complete backup includes:
+
+- `TRAVIANZ_DATA_DIR/runtime`
+- an SQL dump of the database
+- `.env`, stored securely
+
+Database backup:
+
+```bash
+docker compose exec -T db mariadb-dump \
+  -u root -p \
+  --single-transaction --routines --triggers \
+  travian > travianz-backup.sql
+```
+
+Runtime backup:
+
+```bash
+tar -czf travianz-runtime-backup.tar.gz -C ../data runtime
+```
+
+## Updating
+
+Current manual source update:
+
+```bash
+git pull
+docker compose build web
+docker compose up -d
+```
+
+Unattended updates should not be enabled by default. A safe automated workflow should back up data, pull the new image, recreate containers, run health checks and roll back on failure.
+
+## Migrating an existing installation
+
+Always test the migration on a copy first.
+
+### 1. Freeze and back up the old installation
+
+Stop writes to the old instance, archive its files and export the database:
+
+```bash
+mysqldump \
+  --single-transaction \
+  --routines \
+  --triggers \
+  --default-character-set=utf8mb4 \
+  -u CURRENT_USER -p CURRENT_DATABASE \
+  > travianz-database.sql
+```
+
+Record the existing table prefix, URLs, timezone, server settings, cron configuration and mail configuration.
+
+### 2. Start the Docker services
+
+```bash
+cp .env.example .env
+docker compose up -d db web
 docker compose ps
 ```
 
-### View Logs
+Do not create a new world when importing an existing database.
+
+### 3. Import the SQL dump
 
 ```bash
-# All containers
-docker compose logs
-
-# Specific container
-docker compose logs web
-docker compose logs db
-docker compose logs phpmyadmin
-
-# Follow logs in real-time
-docker compose logs -f web
+docker compose exec -T db mariadb \
+  -u travianz -p travian \
+  < travianz-database.sql
 ```
 
-### Stop Containers
+Verify the tables:
 
 ```bash
-docker compose down
+docker compose exec -T db mariadb \
+  -u travianz -p -D travian \
+  -e "SHOW TABLES;"
 ```
 
-### Stop and Remove All Data
+### 4. Copy only generated runtime files
 
-**WARNING:** This will delete all database data!
+Do not overwrite the Docker image with the complete old application tree.
+
+Review and migrate only required mutable files, including:
+
+```text
+GameEngine/config.php
+GameEngine/Admin/Mods/constant_format.tpl
+GameEngine/Prevention/
+GameEngine/Notes/
+Templates/text.tpl
+var/
+automation.lck
+```
+
+Copy them into `TRAVIANZ_DATA_DIR/runtime` while preserving the table prefix.
+
+Update the database host to `db`, port to `3306`, and credentials to the values from `.env`.
+
+When using a reverse proxy, update `DOMAIN`, `HOMEPAGE` and `SERVER` to the public HTTPS URL.
+
+### 5. Mark the installation complete and apply permissions
 
 ```bash
-docker compose down -v
+sudo mkdir -p ../data/runtime/var
+sudo touch ../data/runtime/var/installed
+sudo chown -R www-data:www-data ../data/runtime
+sudo find ../data/runtime -type d -exec chmod 750 {} \;
+sudo find ../data/runtime -type f -exec chmod 640 {} \;
+docker compose restart web
 ```
 
-### Restart Containers
+### 6. Validate before cutover
 
-```bash
-docker compose restart
-```
+Check:
 
-### Rebuild Containers
+- homepage, registration and login
+- administrator access
+- users, villages and resources
+- building queues and troop movements
+- reports, messages and alliances
+- automation and scheduled tasks
+- mail delivery
+- reverse-proxy HTTPS links
 
-If you make changes to the Dockerfile or application code:
+Keep the old instance and backups until validation is complete.
 
-```bash
-docker compose down
-docker compose up -d --build
-```
+## Planned improvements
 
-## Accessing the Containers
+- dedicated cron service
+- reverse-proxy-aware public URL configuration
+- optional SMTP environment variables
+- GitHub Actions image builds
+- GHCR image publication
+- controlled update automation with backup and rollback
+- web healthcheck
+- installer database fields prefilled from Docker variables
+- progress indicators during database and world creation
+- removal of obsolete `chmod 777` instructions
+- `Europe/Paris` and improved timezone selection
+- player language selection during registration
+- fixes for long administration menu entries
 
-### Access Web Container Shell
+## Demonstration
 
-```bash
-docker exec -it travianz-web bash
-```
-
-### Access MySQL Container
-
-```bash
-docker exec -it travianz-db mysql -u root -p
-```
-
-Enter the root password from your `.env` file.
-
-## Troubleshooting
-
-### Installation Files Not Writable
-
-If you get permission errors during installation:
-
-```bash
-docker exec -it travianz-web chown -R www-data:www-data /var/www/html
-docker exec -it travianz-web chmod -R 777 /var/www/html/var
-```
-
-### Database Connection Failed
-
-1. Make sure the database container is running:
-   ```bash
-  docker compose ps
-   ```
-
-2. Check database logs:
-   ```bash
-  docker compose logs db
-   ```
-
-3. Verify the hostname is set to `db` (not `localhost` or `127.0.0.1`)
-
-### Reset Installation
-
-If you need to start the installation over:
-
-1. Stop containers:
-   ```bash
-  docker compose down -v
-   ```
-
-2. Remove the installed flag:
-   ```bash
-   rm -f var/installed
-   rm -f GameEngine/config.php
-   ```
-
-3. Start containers again:
-   ```bash
-  docker compose up -d
-   ```
-
-4. Access the installation wizard again at http://localhost:8080/install
-
-### Port Already in Use
-
-If port 8080 or 8081 is already in use, edit `docker compose` configuration (`docker-compose.yml`) and change the ports:
-
-```yaml
-services:
-  web:
-    ports:
-      - "9080:80"  # Change 8080 to any available port
-  phpmyadmin:
-    ports:
-      - "9081:80"  # Change 8081 to any available port
-```
-
-## Backup and Restore
-
-### Backup Database
-
-```bash
-docker exec travianz-db mariadb-dump -u root -p travian > backup_$(date +%Y%m%d).sql
-```
-
-### Restore Database
-
-```bash
-docker exec -i travianz-db mariadb -u root -p travian < backup_20231125.sql
-```
-
-### Backup Application Files
-
-```bash
-tar -czf travianz_backup_$(date +%Y%m%d).tar.gz \
-  --exclude='./var/db' \
-  --exclude='./.git' \
-  .
-```
-
-## Production Deployment
-
-For production environments, consider the following:
-
-1. **Use Strong Passwords:** Change all default passwords in `.env`
-
-2. **Use SSL/TLS:** Set up a reverse proxy (nginx/traefik) with Let's Encrypt
-
-3. **Limit Database Access:** Remove the database port exposure in the `docker compose` configuration (`docker-compose.yml`)
-
-4. **Regular Backups:** Set up automated backup scripts
-
-5. **Resource Limits:** Add resource constraints to containers:
-
-```yaml
-services:
-  web:
-    deploy:
-      resources:
-        limits:
-          cpus: '1.0'
-          memory: 1G
-```
-
-6. **Monitoring:** Consider adding monitoring tools like Prometheus and Grafana
-
-## Performance Optimization
-
-### MariaDB Tuning
-
-Edit `docker-compose.yml` to add MariaDB configuration:
-
-```yaml
-services:
-  db:
-    command: >
-      --sql_mode=""
-      --max_connections=200
-      --innodb_buffer_pool_size=512M
-      --query_cache_size=32M
-      --query_cache_limit=2M
-```
-
-### PHP Tuning
-
-Create a custom PHP configuration file `php-custom.ini`:
-
-```ini
-memory_limit = 256M
-upload_max_filesize = 20M
-post_max_size = 20M
-max_execution_time = 300
-```
-
-Then mount it in `docker-compose.yml`:
-
-```yaml
-services:
-  web:
-    volumes:
-      - ./php-custom.ini:/usr/local/etc/php/conf.d/custom.ini
-```
-
-## Updates
-
-To update TravianZ to the latest version:
-
-```bash
-git pull origin main
-docker compose down
-docker compose up -d --build
-```
-
-## Support
-
-For issues and questions:
-- GitHub Issues: https://github.com/Shadowss/TravianZ/issues
-- Gitter Chat: https://gitter.im/TravianZ-V8/Lobby
-
-## License
-
-TravianZ Project - See LICENSE file for details
+A temporary public test instance may be provided to maintainers. Test credentials must be shared privately and never committed or posted in a public issue.
