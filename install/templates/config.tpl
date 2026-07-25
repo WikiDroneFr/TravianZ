@@ -66,11 +66,45 @@ if(file_exists($envPath)) {
     }
 }
 
-$dbHost = $envDefaults['DB_HOST']?? 'localhost';
-$dbPort = $envDefaults['DB_PORT']?? '3306';
-$dbUser = $envDefaults['MARIADB_USER']?? ($envDefaults['MYSQL_USER']?? '');
-$dbPass = $envDefaults['MARIADB_PASSWORD']?? ($envDefaults['MYSQL_PASSWORD']?? '');
-$dbName = $envDefaults['MARIADB_DATABASE']?? ($envDefaults['MYSQL_DATABASE']?? '');
+$getInstallEnv = static function(string $key, string $fallback = '') use ($envDefaults): string {
+    $processValue = getenv($key);
+    if($processValue !== false && $processValue !== '') {
+        return (string) $processValue;
+    }
+
+    return isset($envDefaults[$key]) && $envDefaults[$key] !== ''
+        ? (string) $envDefaults[$key]
+        : $fallback;
+};
+
+$dbHost = $getInstallEnv('DB_HOST', 'localhost');
+$dbPort = $getInstallEnv('DB_PORT', '3306');
+$dbUser = $getInstallEnv('MARIADB_USER', $getInstallEnv('MYSQL_USER'));
+$dbPass = $getInstallEnv('MARIADB_PASSWORD', $getInstallEnv('MYSQL_PASSWORD'));
+$dbName = $getInstallEnv('MARIADB_DATABASE', $getInstallEnv('MYSQL_DATABASE'));
+
+$publicUrl = trim($getInstallEnv('TRAVIANZ_PUBLIC_URL'));
+
+if($publicUrl === '') {
+    $forwardedProto = trim(explode(',', (string) ($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? ''))
+        [0]);
+    $forwardedHost = trim(explode(',', (string) ($_SERVER['HTTP_X_FORWARDED_HOST'] ?? ''))
+        [0]);
+
+    $scheme = in_array(strtolower($forwardedProto), ['http', 'https'], true)
+        ? strtolower($forwardedProto)
+        : ((!empty($_SERVER['HTTPS']) && strtolower((string) $_SERVER['HTTPS']) !== 'off')
+            ? 'https'
+            : 'http');
+
+    $host = $forwardedHost !== ''
+        ? $forwardedHost
+        : (string) ($_SERVER['HTTP_HOST'] ?? 'localhost');
+
+    $publicUrl = $scheme . '://' . $host;
+}
+
+$publicUrl = rtrim($publicUrl, '/') . '/';
 
 if(empty($_SESSION['install_random_prefix'])) {
     try {
@@ -173,9 +207,9 @@ $dbPrefix = $_SESSION['install_random_prefix'];
   <div class="card">
     <span class="f10 c">SERVER URLS</span>
     <div style="margin-top:12px;display:grid;gap:10px;">
-      <div><label>Server</label><input class="input" name="server" id="homepage" value="http://<?=$_SERVER['HTTP_HOST']?>/"></div>
-      <div><label>Domain</label><input class="input" name="domain" id="homepage" value="http://<?=$_SERVER['HTTP_HOST']?>/"></div>
-      <div><label>Homepage</label><input class="input" name="homepage" id="homepage" value="http://<?=$_SERVER['HTTP_HOST']?>/"></div>
+      <div><label>Server</label><input class="input" name="server" id="server" value="<?=htmlspecialchars($publicUrl, ENT_QUOTES, 'UTF-8')?>"></div>
+      <div><label>Domain</label><input class="input" name="domain" id="domain" value="<?=htmlspecialchars($publicUrl, ENT_QUOTES, 'UTF-8')?>"></div>
+      <div><label>Homepage</label><input class="input" name="homepage" id="homepage" value="<?=htmlspecialchars($publicUrl, ENT_QUOTES, 'UTF-8')?>"></div>
       <div><label>Medal Interval</label><select class="input" name="medalinterval"><option value="0">none</option><option value="(3600*24)">1 day</option><option value="(3600*24*2)">2 days</option><option value="(3600*24*3)">3 days</option><option value="(3600*24*4)">4 days</option><option value="(3600*24*5)">5 days</option><option value="(3600*24*6)">6 days</option><option value="(3600*24*7)" selected>7 days</option></select></div>
       <div><label>Great Workshop</label><select class="input" name="great_wks"><option value="true">true</option><option value="false" selected>false</option></select></div>
       <div><label>WW enabled</label><select class="input" name="ww"><option value="true">true</option><option value="false" selected>false</option></select></div>

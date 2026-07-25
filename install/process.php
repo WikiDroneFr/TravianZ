@@ -41,6 +41,49 @@ class Process {
 						}
 	}
 
+        private function normalizePublicUrl($value) {
+                $value = trim((string) $value);
+
+                if($value === '' || filter_var($value, FILTER_VALIDATE_URL) === false) {
+                        return null;
+                }
+
+                $parts = parse_url($value);
+
+                if(!is_array($parts)
+                    || empty($parts['scheme'])
+                    || empty($parts['host'])
+                    || !in_array(strtolower($parts['scheme']), ['http', 'https'], true)
+                    || isset($parts['user'])
+                    || isset($parts['pass'])
+                    || isset($parts['query'])
+                    || isset($parts['fragment'])) {
+                        return null;
+                }
+
+                $scheme = strtolower($parts['scheme']);
+                $host = $parts['host'];
+
+                $url = $scheme . '://' . $host;
+
+                if(isset($parts['port'])) {
+                        $port = (int) $parts['port'];
+
+                        if($port < 1 || $port > 65535) {
+                                return null;
+                        }
+
+                        $url .= ':' . $port;
+                }
+
+                if(!empty($parts['path']) && $parts['path'] !== '/') {
+                        $url .= '/' . trim($parts['path'], '/');
+                }
+
+                return rtrim($url, '/') . '/';
+        }
+
+
 	private function constForm() {
 	    $configFile = "../GameEngine/config.php";
 		$configTemplateFile = "../GameEngine/Admin/Mods/constant_format.tpl";
@@ -179,9 +222,17 @@ class Process {
 
 		$findReplace["%HERORESALL%"] = $resAll;
 		$findReplace["%HERORESONE%"] = $resOne;
-		$findReplace["%DOMAIN%"] = $_POST['domain'];
-		$findReplace["%HOMEPAGE%"] = $_POST['homepage'];
-		$findReplace["%SERVER%"] = $_POST['server'];
+                $domain = $this->normalizePublicUrl($_POST['domain'] ?? '');
+                $homepage = $this->normalizePublicUrl($_POST['homepage'] ?? '');
+                $server = $this->normalizePublicUrl($_POST['server'] ?? '');
+
+                if($domain === null || $homepage === null || $server === null) {
+                        die("<span class='f18 c5'>ERROR!</span><br />Server, domain and homepage must be valid HTTP or HTTPS URLs.");
+                }
+
+                $findReplace["%DOMAIN%"] = addcslashes($domain, "\\\"");
+                $findReplace["%HOMEPAGE%"] = addcslashes($homepage, "\\\"");
+                $findReplace["%SERVER%"] = addcslashes($server, "\\\"");
 		$findReplace["%LIMIT_MAILBOX%"] = $_POST['limit_mailbox'];
 		$findReplace["%MAX_MAILS%"] = $_POST['max_mails'];
 		$findReplace["%DEMOLISH%"] = $_POST['demolish'];

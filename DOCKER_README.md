@@ -121,6 +121,24 @@ The service:
 
 No host-level cron entry is required for the Docker deployment.
 
+## Public URL configuration
+
+Set `TRAVIANZ_PUBLIC_URL` when the application is exposed through a reverse proxy:
+
+```env
+TRAVIANZ_PUBLIC_URL=https://travianz.example.org
+```
+
+During installation, TravianZ uses this value to prefill the Server, Domain and Homepage fields.
+
+If the variable is empty, the installer falls back to:
+
+1. `X-Forwarded-Proto` and `X-Forwarded-Host`
+2. the current HTTPS state and `HTTP_HOST`
+3. `http://localhost/`
+
+The generated URLs are restricted to valid HTTP or HTTPS URLs and are normalized with a trailing slash.
+
 ## Reverse proxy
 
 TravianZ has been tested behind Nginx Proxy Manager.

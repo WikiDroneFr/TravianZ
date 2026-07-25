@@ -8,6 +8,13 @@ services:
     image: wikidronefr/travianz:poc
     ports:
       - "${TRAVIANZ_HTTP_PORT:-8810}:80"
+    environment:
+      TRAVIANZ_PUBLIC_URL: "${TRAVIANZ_PUBLIC_URL:-}"
+      DB_HOST: "db"
+      DB_PORT: "3306"
+      MARIADB_DATABASE: "${MARIADB_DATABASE:-travian}"
+      MARIADB_USER: "${MARIADB_USER:-travianz}"
+      MARIADB_PASSWORD: "${MARIADB_PASSWORD:?required}"
     volumes:
       - "${TRAVIANZ_DATA_DIR:-../data}/runtime:/var/lib/travianz-runtime"
     depends_on:
