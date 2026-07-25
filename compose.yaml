@@ -42,6 +42,35 @@ services:
     networks:
       - travianz
 
+  cron:
+    image: wikidronefr/travianz:poc
+    command:
+      - /bin/sh
+      - -c
+      - |
+        while [ ! -f /var/www/html/GameEngine/config.php ]; do
+          echo "cron: waiting for TravianZ installation..."
+          sleep 15
+        done
+
+        while true; do
+          su -s /bin/sh www-data -c 'php /var/www/html/cron.php'
+          status=$$?
+
+          if [ "$$status" -ne 0 ]; then
+            echo "cron: execution failed with status $$status"
+            sleep 30
+          fi
+        done
+    volumes:
+      - "${TRAVIANZ_DATA_DIR:-../data}/runtime:/var/lib/travianz-runtime"
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - travianz
+
   phpmyadmin:
     image: phpmyadmin:5.2.2-apache
     profiles:

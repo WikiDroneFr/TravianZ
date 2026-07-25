@@ -17,7 +17,7 @@ Validated with:
 - automatic blocking of `/install` after setup
 - HTTPS access behind Nginx Proxy Manager
 
-This is still a proof of concept. Cron automation, reverse-proxy URL handling, SMTP configuration, image publishing and controlled updates are still planned.
+This is still a proof of concept. Docker cron automation is now integrated. Reverse-proxy URL handling, SMTP configuration, image publishing and controlled updates are still planned.
 
 ## Requirements
 
@@ -98,6 +98,28 @@ http://localhost:8811
 ```
 
 Do not expose phpMyAdmin publicly without additional protection.
+
+## Docker automation service
+
+The Compose stack includes a dedicated `cron` service.
+
+It runs the TravianZ automation process independently from player page requests:
+
+```bash
+docker compose ps cron
+docker compose logs -f cron
+```
+
+The service:
+
+- waits until TravianZ has been installed
+- runs `cron.php` in CLI mode
+- executes the PHP process as `www-data`
+- shares the same persistent runtime directory as the web container
+- relies on TravianZ internal locking to prevent overlapping executions
+- updates `GameEngine/Prevention/cron_active.txt` on every tick
+
+No host-level cron entry is required for the Docker deployment.
 
 ## Reverse proxy
 
@@ -271,7 +293,6 @@ Keep the old instance and backups until validation is complete.
 
 ## Planned improvements
 
-- dedicated cron service
 - reverse-proxy-aware public URL configuration
 - optional SMTP environment variables
 - GitHub Actions image builds
