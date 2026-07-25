@@ -1,45 +1,59 @@
 FROM php:8.3-apache
 
-# Install system dependencies
-RUN apt-get update && apt-get install -y \
-    libpng-dev \
-    libjpeg62-turbo-dev \
-    libfreetype6-dev \
-    libzip-dev \
-    zip \
-    unzip \
-    git \
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+        libpng-dev \
+        libjpeg62-turbo-dev \
+        libfreetype6-dev \
+        libzip-dev \
+        unzip \
+    && docker-php-ext-configure gd --with-freetype --with-jpeg \
+    && docker-php-ext-install -j"$(nproc)" \
+        gd \
+        mysqli \
+        pdo \
+        pdo_mysql \
+        zip \
+    && a2enmod rewrite headers \
     && rm -rf /var/lib/apt/lists/*
 
-# Configure and install PHP extensions
-RUN docker-php-ext-configure gd --with-freetype --with-jpeg \
-    && docker-php-ext-install -j$(nproc) \
-    gd \
-    mysqli \
-    pdo \
-    pdo_mysql \
-    zip
-
-# Enable Apache modules
-RUN a2enmod rewrite headers
-
-# Use the production PHP configuration as a baseline, then apply our overrides
-# so that errors are hidden from end users and logged server-side instead.
 RUN cp "$PHP_INI_DIR/php.ini-production" "$PHP_INI_DIR/php.ini"
-COPY docker/php/zz-travianz.ini "$PHP_INI_DIR/conf.d/zz-travianz.ini"
 
-# Set working directory
+COPY docker/php/zz-travianz.ini \
+     "$PHP_INI_DIR/conf.d/zz-travianz.ini"
+
 WORKDIR /var/www/html
 
-# Runtime source code is bind-mounted by docker-compose.
-# Keep only minimal folder bootstrap inside the image.
-RUN mkdir -p /var/www/html/var
+COPY . /var/www/html
 
-# Configure Apache to use /var/www/html as DocumentRoot
-RUN sed -i 's!/var/www/html!/var/www/html!g' /etc/apache2/sites-available/000-default.conf
+# Preserve pristine copies of the writable runtime files and directories.
+RUN mkdir -p \
+        /usr/local/share/travianz-runtime-seed/var \
+        /usr/local/share/travianz-runtime-seed/Prevention \
+        /usr/local/share/travianz-runtime-seed/Notes \
+    && cp -a /var/www/html/var/. \
+        /usr/local/share/travianz-runtime-seed/var/ \
+    && cp -a /var/www/html/GameEngine/Prevention/. \
+        /usr/local/share/travianz-runtime-seed/Prevention/ \
+    && cp -a /var/www/html/GameEngine/Notes/. \
+        /usr/local/share/travianz-runtime-seed/Notes/ \
+    && cp /var/www/html/Templates/text.tpl \
+        /usr/local/share/travianz-runtime-seed/text.tpl
 
-# Expose Apache port
+COPY docker/apache/travianz-security.conf \
+     /etc/apache2/conf-available/travianz-security.conf
+
+COPY docker/entrypoint.sh /usr/local/bin/travianz-entrypoint
+
+RUN a2enconf travianz-security \
+    && chmod 755 /usr/local/bin/travianz-entrypoint \
+    && chown -R root:root /var/www/html \
+    && find /var/www/html -type d -exec chmod 755 {} \; \
+    && find /var/www/html -type f -exec chmod 644 {} \;
+
+VOLUME ["/var/lib/travianz-runtime"]
+
 EXPOSE 80
 
-# Start Apache
+ENTRYPOINT ["travianz-entrypoint"]
 CMD ["apache2-foreground"]
