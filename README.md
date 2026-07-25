@@ -230,21 +230,22 @@ Miscellaneous
 git clone https://github.com/Shadowss/TravianZ.git
 cd TravianZ
 cp .env.example .env
-docker compose up -d
+# Edit .env and replace the example database passwords.
+docker compose up -d --build
 ```
 
 Then open:
 
-- `http://localhost:8080/install`
+- `http://localhost:8810/install`
 
-Detailed container guide: [DOCKER_README.md](DOCKER_README.md)
+For Docker deployment, migration, reverse-proxy, backup and update information, see [DOCKER_README.md](DOCKER_README.md).
 
 ## System Requirements
 
 Recommended:
 
 - PHP `8.3+`
-- MariaDB `latest stable` (or MySQL-compatible server)
+- MariaDB `11.4` for the tested Docker deployment, or a compatible MariaDB/MySQL server
 - Apache or Nginx with PHP support
 - Linux server with enough CPU/RAM for your expected player count
 
@@ -273,16 +274,17 @@ Notes:
 
 Use `.env` (copy from `.env.example`) to manage deployment values.
 
-Main keys:
+Main Docker keys:
 
+- `TRAVIANZ_HTTP_PORT`
+- `TRAVIANZ_DATA_DIR`
 - `MARIADB_ROOT_PASSWORD`
 - `MARIADB_DATABASE`
 - `MARIADB_USER`
 - `MARIADB_PASSWORD`
-- `DB_HOST`
-- `DB_PORT`
+- `PHPMYADMIN_HTTP_PORT`
 
-Legacy compatibility keys (`MYSQL_*`) are still supported and can inherit MariaDB values.
+Inside the Docker network, the database host is `db` and the database port is `3306`. These values are currently entered in the web installer.
 
 ## Admin Panel
 
@@ -395,7 +397,8 @@ Useful commands:
 
 ```bash
 # Start stack
-docker compose up -d
+# Edit .env and replace the example database passwords.
+docker compose up -d --build
 
 # Logs
 docker compose logs -f web
