@@ -278,13 +278,14 @@ Main Docker keys:
 
 - `TRAVIANZ_HTTP_PORT`
 - `TRAVIANZ_DATA_DIR`
+- `TRAVIANZ_PUBLIC_URL`
 - `MARIADB_ROOT_PASSWORD`
 - `MARIADB_DATABASE`
 - `MARIADB_USER`
 - `MARIADB_PASSWORD`
 - `PHPMYADMIN_HTTP_PORT`
 
-Inside the Docker network, the database host is `db` and the database port is `3306`. These values are currently entered in the web installer.
+Inside the Docker network, the database host is `db` and the database port is `3306`. Docker database values are passed to the container and prefilled in the web installer.
 
 ## Admin Panel
 

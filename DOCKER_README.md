@@ -50,7 +50,7 @@ http://localhost:8810
 
 ## Installer database settings
 
-Use:
+Docker pre-fills these values from the container environment. Verify:
 
 ```text
 Host: db
@@ -173,13 +173,6 @@ X-Forwarded-Proto
 X-Real-IP
 ```
 
-A future version should support:
-
-```env
-TRAVIANZ_PUBLIC_URL=https://travianz.example.org
-```
-
-This value should define `DOMAIN`, `HOMEPAGE` and `SERVER` so public links never expose an internal address or port.
 
 ## Security
 
@@ -328,7 +321,6 @@ Keep the old instance and backups until validation is complete.
 - GitHub Actions image builds
 - GHCR image publication
 - controlled update automation with backup and rollback
-- installer database fields prefilled from Docker variables
 - progress indicators during database and world creation
 - removal of obsolete `chmod 777` instructions
 - `Europe/Paris` and improved timezone selection
