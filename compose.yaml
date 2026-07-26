@@ -5,7 +5,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    image: wikidronefr/travianz:poc
+    image: travianz:local
     ports:
       - "${TRAVIANZ_HTTP_PORT:-8810}:80"
     environment:
@@ -59,7 +59,7 @@ services:
       - travianz
 
   cron:
-    image: wikidronefr/travianz:poc
+    image: travianz:local
     command:
       - /bin/sh
       - -c

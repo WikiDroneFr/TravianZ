@@ -28,9 +28,8 @@ This is still a proof of concept. Docker cron automation, reverse-proxy-aware pu
 ## Quick start
 
 ```bash
-git clone https://github.com/WikiDroneFr/TravianZ.git
+git clone https://github.com/Shadowss/TravianZ.git
 cd TravianZ
-git switch feature/docker-poc
 cp .env.example .env
 ```
 
