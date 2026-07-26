@@ -17,7 +17,7 @@ Validated with:
 - automatic blocking of `/install` after setup
 - HTTPS access behind Nginx Proxy Manager
 
-This is still a proof of concept. Docker cron automation is now integrated. Reverse-proxy URL handling, SMTP configuration, image publishing and controlled updates are still planned.
+This is still a proof of concept. Docker cron automation, reverse-proxy-aware public URL handling and a web healthcheck are now integrated. SMTP configuration, image publishing and controlled updates are still planned.
 
 ## Requirements
 
@@ -99,6 +99,19 @@ http://localhost:8811
 
 Do not expose phpMyAdmin publicly without additional protection.
 
+## Container healthcheck
+
+The `web` service includes an HTTP healthcheck executed inside the container.
+
+It checks that Apache accepts connections and returns an HTTP status in the 2xx or 3xx range:
+
+```bash
+docker compose ps
+docker inspect --format="{{.State.Health.Status}}" travianz-docker-poc-web-1
+```
+
+The healthcheck uses PHP directly and does not require `curl` or another external HTTP client.
+
 ## Docker automation service
 
 The Compose stack includes a dedicated `cron` service.
@@ -112,7 +125,7 @@ docker compose logs -f cron
 
 The service:
 
-- waits until TravianZ has been installed
+- waits for the final `var/installed` marker before starting automation
 - runs `cron.php` in CLI mode
 - executes the PHP process as `www-data`
 - shares the same persistent runtime directory as the web container
@@ -311,12 +324,10 @@ Keep the old instance and backups until validation is complete.
 
 ## Planned improvements
 
-- reverse-proxy-aware public URL configuration
 - optional SMTP environment variables
 - GitHub Actions image builds
 - GHCR image publication
 - controlled update automation with backup and rollback
-- web healthcheck
 - installer database fields prefilled from Docker variables
 - progress indicators during database and world creation
 - removal of obsolete `chmod 777` instructions

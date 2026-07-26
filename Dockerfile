@@ -44,6 +44,7 @@ COPY docker/apache/travianz-security.conf \
      /etc/apache2/conf-available/travianz-security.conf
 
 COPY docker/entrypoint.sh /usr/local/bin/travianz-entrypoint
+COPY docker/healthcheck.php /usr/local/bin/travianz-healthcheck.php
 
 RUN a2enconf travianz-security \
     && chmod 755 /usr/local/bin/travianz-entrypoint \
